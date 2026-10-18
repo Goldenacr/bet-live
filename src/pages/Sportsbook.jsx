@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Ticket, Trash2 } from 'lucide-react';
+import { Ticket, Trash2, CheckCircle } from 'lucide-react';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
 
@@ -22,12 +22,17 @@ export default function Sportsbook() {
     fetchMatches();
   }, []);
 
-  const togglePick = (match, pick, odds) => {
+  const togglePick = (match, pick, odds, label) => {
     setSlip(prev => {
+      // Remove this match from slip if it's already there (only one bet per match)
       const filtered = prev.filter(p => p.matchId !== match.id);
+      
+      // If the exact same pick is clicked again, just remove it (unselect)
       const existing = prev.find(p => p.matchId === match.id && p.pick === pick);
       if (existing) return filtered;
-      return [...filtered, { matchId: match.id, home: match.home, away: match.away, pick, odds }];
+
+      // Otherwise, add the new pick
+      return [...filtered, { matchId: match.id, home: match.home, away: match.away, pick, odds, label }];
     });
   };
 
@@ -44,11 +49,13 @@ export default function Sportsbook() {
 
     try {
       if (slip.length === 1) {
+        // SINGLE BET
         const res = await axios.post(`${API_URL}/api/bets/place`, { 
           matchId: slip[0].matchId, pick: slip[0].pick, amount: parseInt(amount), userJid: user.jid 
         });
         if (res.data.success) setMessage(`✅ Single Bet placed! Potential: ${res.data.bet.potentialWin}`);
       } else {
+        // MULTIPLE BET (ACCUMULATOR)
         const res = await axios.post(`${API_URL}/api/bets/place-multiple`, { 
           selections: slip, amount: parseInt(amount), userJid: user.jid 
         });
@@ -67,6 +74,7 @@ export default function Sportsbook() {
       <h1 className="text-2xl font-black mb-6 flex items-center gap-2"><Ticket /> Sportsbook</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* MATCHES LIST */}
         <div className="lg:col-span-2 space-y-4">
           {matches.map(match => (
             <div key={match.id} className="bg-card p-4 rounded-xl border border-gray-700">
@@ -79,16 +87,29 @@ export default function Sportsbook() {
                 <div className="text-gray-500 text-sm">vs</div>
                 <div className="font-bold text-lg w-1/3 pl-4">{match.away}</div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => togglePick(match, 'home', 2.0)} className={`p-2 rounded font-bold text-sm border transition-colors ${slip.find(p => p.matchId === match.id && p.pick === 'home') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300 hover:border-brand'}`}>1 (2.0x)</button>
-                <button onClick={() => togglePick(match, 'draw', 3.0)} className={`p-2 rounded font-bold text-sm border transition-colors ${slip.find(p => p.matchId === match.id && p.pick === 'draw') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300 hover:border-brand'}`}>X (3.0x)</button>
-                <button onClick={() => togglePick(match, 'away', 2.5)} className={`p-2 rounded font-bold text-sm border transition-colors ${slip.find(p => p.matchId === match.id && p.pick === 'away') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300 hover:border-brand'}`}>2 (2.5x)</button>
+              
+              {/* ODDS SECTION */}
+              <div className="space-y-3">
+                {/* 1X2 */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => togglePick(match, 'home', 2.0, 'Home')} className={`p-2 rounded font-bold text-xs border ${slip.find(p => p.matchId === match.id && p.pick === 'home') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>1 (2.0x)</button>
+                  <button onClick={() => togglePick(match, 'draw', 3.0, 'Draw')} className={`p-2 rounded font-bold text-xs border ${slip.find(p => p.matchId === match.id && p.pick === 'draw') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>X (3.0x)</button>
+                  <button onClick={() => togglePick(match, 'away', 2.5, 'Away')} className={`p-2 rounded font-bold text-xs border ${slip.find(p => p.matchId === match.id && p.pick === 'away') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>2 (2.5x)</button>
+                </div>
+                
+                {/* Additional Odds Row */}
+                <div className="grid grid-cols-4 gap-2">
+                  <button onClick={() => togglePick(match, 'btts_yes', 1.8, 'BTTS Yes')} className={`p-2 rounded font-bold text-[10px] border ${slip.find(p => p.matchId === match.id && p.pick === 'btts_yes') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>BTTS (1.8x)</button>
+                  <button onClick={() => togglePick(match, 'over_2.5', 1.9, 'Over 2.5')} className={`p-2 rounded font-bold text-[10px] border ${slip.find(p => p.matchId === match.id && p.pick === 'over_2.5') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>Over 2.5 (1.9x)</button>
+                  <button onClick={() => togglePick(match, 'homeordraw', 1.3, '1X')} className={`p-2 rounded font-bold text-[10px] border ${slip.find(p => p.matchId === match.id && p.pick === 'homeordraw') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>1X (1.3x)</button>
+                  <button onClick={() => togglePick(match, 'draworaway', 1.4, 'X2')} className={`p-2 rounded font-bold text-[10px] border ${slip.find(p => p.matchId === match.id && p.pick === 'draworaway') ? 'bg-brand border-brand text-white' : 'bg-dark border-gray-700 text-gray-300'}`}>X2 (1.4x)</button>
+                </div>
               </div>
             </div>
           ))}
-          {matches.length === 0 && <div className="text-gray-500 text-center p-10">No upcoming matches available.</div>}
         </div>
 
+        {/* BET SLIP */}
         <div className="bg-card rounded-xl border border-gray-700 p-4 h-fit sticky top-6">
           <h2 className="text-lg font-bold mb-4 border-b border-gray-700 pb-2 flex justify-between">
             Bet Slip <span className="bg-brand text-white text-xs px-2 py-1 rounded-full">{slip.length}</span>
@@ -102,7 +123,7 @@ export default function Sportsbook() {
                 <div key={idx} className="bg-dark p-3 rounded-lg border border-gray-700 relative">
                   <button onClick={() => togglePick({id: item.matchId}, item.pick)} className="absolute top-2 right-2 text-red-500 hover:text-red-400"><Trash2 size={14}/></button>
                   <div className="text-xs text-gray-400">{item.home} vs {item.away}</div>
-                  <div className="font-bold text-sm text-brand mt-1">{item.pick.toUpperCase()} @ {item.odds}x</div>
+                  <div className="font-bold text-sm text-brand mt-1">{item.label} @ {item.odds}x</div>
                 </div>
               ))}
             </div>
@@ -126,7 +147,7 @@ export default function Sportsbook() {
               )}
 
               <button onClick={handlePlaceBet} disabled={placing} className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-3 rounded-lg flex justify-center items-center gap-2">
-                {placing ? 'Placing...' : slip.length === 1 ? 'Place Single Bet' : 'Place Multiple Bet'}
+                {placing ? 'Processing...' : slip.length === 1 ? 'Confirm Single Bet' : 'Confirm Multiple Bet'}
               </button>
             </>
           )}
@@ -137,4 +158,4 @@ export default function Sportsbook() {
       </div>
     </div>
   );
-                                 }
+                                                                                                                                                      }
