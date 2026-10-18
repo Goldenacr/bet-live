@@ -32,7 +32,7 @@ export default function LiveMatch() {
   const [minute, setMinute] = useState(0);
   const [events, setEvents] = useState([]);
   const [commentary, setCommentary] = useState([]);
-  const [ballPos, setBallPos] = useState({ top: '50%', left: '50%' }); // Ball state
+  const [ballPos, setBallPos] = useState({ top: '50%', left: '50%' }); 
   const [activeTab, setActiveTab] = useState('overview'); 
 
   const [betAmount, setBetAmount] = useState('');
@@ -67,7 +67,7 @@ export default function LiveMatch() {
       setMinute(data.minute);
       setEvents(data.events || []);
       if (data.commentary) setCommentary(data.commentary);
-      if (data.ballPos) setBallPos(data.ballPos); // Update ball position
+      if (data.ballPos) setBallPos(data.ballPos);
     });
     return () => socket.off(`match_update_${id}`);
   }, [id]);
@@ -99,6 +99,7 @@ export default function LiveMatch() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 font-bold"><ArrowLeft size={20} /> Back to Dashboard</button>
 
+      {/* SCOREBOARD */}
       <div className="bg-card rounded-2xl border border-gray-700 p-6 mb-6 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
         {minute > 0 && <div className="absolute top-4 left-4 text-red-500 font-bold flex items-center gap-2 animate-pulse bg-red-500/10 px-3 py-1 rounded-full"><div className="w-2 h-2 bg-red-500 rounded-full"></div> LIVE {minute}'</div>}
         <div className="text-center flex-1 mt-6 md:mt-0">
@@ -123,7 +124,7 @@ export default function LiveMatch() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* ANIMATED PITCH */}
+        {/* PITCH */}
         <div className={`lg:col-span-2 ${activeTab === 'overview' ? 'block' : 'hidden lg:block'}`}>
            <div className="bg-[#2e7d32] rounded-xl border-4 border-[#1b5e20] p-4 h-[500px] relative flex items-center justify-center overflow-hidden shadow-inner">
              
@@ -160,10 +161,10 @@ export default function LiveMatch() {
              {/* ANIMATED BALL */}
              {minute > 0 && minute < 90 && (
                <div 
-                 className="absolute transition-all duration-700 ease-in-out z-20"
+                 className="absolute transition-all duration-1000 ease-in-out z-20"
                  style={{ top: ballPos.top, left: ballPos.left, transform: 'translate(-50%, -50%)' }}
                >
-                 <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)]"></div>
+                 <div className="w-3 h-3 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)] border border-gray-300"></div>
                </div>
              )}
 
@@ -269,4 +270,4 @@ export default function LiveMatch() {
       </div>
     </div>
   );
-        }
+                     }
