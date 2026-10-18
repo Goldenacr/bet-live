@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock } from 'lucide-react';
+import { Calendar, Clock, Hash } from 'lucide-react';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
 
@@ -34,20 +34,20 @@ export default function Fixtures() {
           <div key={match.id} onClick={() => navigate(`/match/${match.id}`)} className="bg-card rounded-xl p-4 border border-gray-700 cursor-pointer hover:border-blue-500 transition-all">
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-bold px-2 py-1 rounded bg-blue-500/20 text-blue-400">UPCOMING</span>
-              <span className="text-xs text-gray-400">{match.league}</span>
+              <span className="text-xs text-gray-400 flex items-center gap-1"><Hash size={12}/> {match.id}</span>
             </div>
             <div className="flex justify-between items-center mb-4">
               <div className="font-bold text-white">{match.home}</div>
               <div className="text-gray-500 text-sm">vs</div>
               <div className="font-bold text-white">{match.away}</div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-4 bg-dark/50 p-2 rounded">
+            <div className="flex items-center gap-2 text-xs text-gray-400 mb-2 bg-dark/50 p-2 rounded">
               <Clock size={14} className="text-brand" /> {formatTime(match.kickoff)}
             </div>
-            <button className="w-full bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold py-2 rounded-lg">View Preview</button>
+            <div className="text-xs text-gray-500 font-bold mb-4">{match.league} {match.cupName && `• 🏆 ${match.cupName}`}</div>
           </div>
         ))}
       </div>
     </div>
   );
-                                         }
+}
