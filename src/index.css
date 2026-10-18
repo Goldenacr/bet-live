@@ -8,7 +8,6 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Custom scrollbar for event timeline */
 ::-webkit-scrollbar {
   width: 6px;
 }
