@@ -9,6 +9,7 @@ import Results from './pages/Results';
 import Standings from './pages/Standings';
 import Tournaments from './pages/Tournaments';
 import MyBets from './pages/MyBets';
+import Sportsbook from './pages/Sportsbook';
 import Admin from './pages/Admin';
 import Settings from './pages/Settings';
 import { Menu } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function App() {
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/sportsbook" element={<Sportsbook />} />
               <Route path="/live" element={<LiveNow />} />
               <Route path="/fixtures" element={<Fixtures />} />
               <Route path="/results" element={<Results />} />
