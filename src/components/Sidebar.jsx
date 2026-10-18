@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Activity, Calendar, Settings, Shield, X } from 'lucide-react';
+import { Home, Activity, Calendar, Settings, Shield, X, CheckCircle, Trophy, Award, Ticket, ShieldAlert } from 'lucide-react';
 
 export default function Sidebar({ isOpen, toggleSidebar }) {
   const location = useLocation();
@@ -8,21 +8,21 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
     { name: 'Dashboard', path: '/', icon: <Home size={20} /> },
     { name: 'Live Now', path: '/live', icon: <Activity size={20} /> },
     { name: 'Fixtures', path: '/fixtures', icon: <Calendar size={20} /> },
+    { name: 'Results', path: '/results', icon: <CheckCircle size={20} /> },
+    { name: 'Standings', path: '/standings', icon: <Trophy size={20} /> },
+    { name: 'Tournaments', path: '/tournaments', icon: <Award size={20} /> },
+    { name: 'My Bets', path: '/mybets', icon: <Ticket size={20} /> },
+    { name: 'Admin Panel', path: '/admin', icon: <ShieldAlert size={20} /> },
     { name: 'Settings', path: '/settings', icon: <Settings size={20} /> },
   ];
 
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={toggleSidebar}
-        ></div>
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={toggleSidebar}></div>
       )}
 
-      {/* Sidebar */}
-      <div className={`fixed top-0 left-0 h-full w-64 bg-card border-r border-gray-800 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+      <div className={`fixed top-0 left-0 h-full w-64 bg-card border-r border-gray-800 z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} overflow-y-auto`}>
         <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <div className="flex items-center gap-2 text-brand">
             <Shield size={28} />
@@ -33,7 +33,7 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
           </button>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-1">
           {menuItems.map((item) => (
             <Link
               key={item.name}
@@ -49,4 +49,4 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
       </div>
     </>
   );
-          }
+}
