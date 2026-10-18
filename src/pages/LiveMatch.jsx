@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import { ArrowLeft, Clock, Activity, Users, Goal, Shield, Circle } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, Goal, MessageSquare } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
@@ -17,6 +17,7 @@ export default function LiveMatch() {
   const [score, setScore] = useState({ home: 0, away: 0 });
   const [minute, setMinute] = useState(0);
   const [events, setEvents] = useState([]);
+  const [commentary, setCommentary] = useState([]);
   const [activeTab, setActiveTab] = useState('overview'); 
 
   const [betAmount, setBetAmount] = useState('');
@@ -37,6 +38,7 @@ export default function LiveMatch() {
       setScore(data.score);
       setMinute(data.minute);
       setEvents(data.events);
+      if (data.commentary) setCommentary(data.commentary);
     });
     return () => socket.off(`match_update_${id}`);
   }, [id]);
@@ -47,13 +49,7 @@ export default function LiveMatch() {
     
     setIsPlacing(true);
     try {
-      const res = await axios.post(`${API_URL}/api/bets/place`, {
-        matchId: id,
-        pick: betPick,
-        amount: parseInt(betAmount),
-        userJid: user.jid,
-        isScore: betPick.includes('score_')
-      });
+      const res = await axios.post(`${API_URL}/api/bets/place`, { matchId: id, pick: betPick, amount: parseInt(betAmount), userJid: user.jid, isScore: betPick.includes('score_') });
       if (res.data.success) {
         setBetMessage(`✅ Bet placed! ${res.data.bet.potentialWin} potential win.`);
         setBetAmount('');
@@ -71,16 +67,15 @@ export default function LiveMatch() {
       <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 font-bold"><ArrowLeft size={20} /> Back to Dashboard</button>
 
       <div className="bg-card rounded-2xl border border-gray-700 p-6 mb-6 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
-        {minute > 0 && (
-          <div className="absolute top-4 left-4 text-red-500 font-bold flex items-center gap-2 animate-pulse bg-red-500/10 px-3 py-1 rounded-full"><div className="w-2 h-2 bg-red-500 rounded-full"></div> LIVE {minute}'</div>
-        )}
+        {minute > 0 && <div className="absolute top-4 left-4 text-red-500 font-bold flex items-center gap-2 animate-pulse bg-red-500/10 px-3 py-1 rounded-full"><div className="w-2 h-2 bg-red-500 rounded-full"></div> LIVE {minute}'</div>}
+        
         <div className="text-center flex-1 mt-6 md:mt-0">
           <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.home[0]}</div>
           <div className="text-xl font-bold">{matchData.home}</div>
         </div>
         <div className="text-center px-8 my-4 md:my-0">
           <div className="text-5xl font-black tracking-tighter">{score.home} <span className="text-gray-600">:</span> {score.away}</div>
-          <div className="text-sm text-gray-400 mt-2 font-bold">{matchData.league}</div>
+          <div className="text-sm text-gray-400 mt-2 font-bold">{matchData.id} | {matchData.league}</div>
         </div>
         <div className="text-center flex-1">
           <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.away[0]}</div>
@@ -88,9 +83,9 @@ export default function LiveMatch() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6 border-b border-gray-800 pb-2">
-        {['overview', 'stats', 'bet'].map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2 rounded-lg font-bold capitalize transition-colors ${activeTab === tab ? 'bg-brand text-white' : 'text-gray-400 hover:bg-gray-800'}`}>{tab}</button>
+      <div className="flex gap-2 mb-6 border-b border-gray-800 pb-2 overflow-x-auto">
+        {['overview', 'commentary', 'stats', 'bet'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg font-bold capitalize transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-brand text-white' : 'text-gray-400 hover:bg-gray-800'}`}>{tab}</button>
         ))}
       </div>
 
@@ -108,8 +103,8 @@ export default function LiveMatch() {
 
         <div className="bg-card rounded-xl border border-gray-700 p-4 h-[400px] overflow-y-auto">
            <h3 className="font-bold text-lg mb-4 flex items-center gap-2 border-b border-gray-700 pb-2">
-             {activeTab === 'stats' ? <Activity size={18}/> : activeTab === 'bet' ? <Goal size={18}/> : <Clock size={18}/>} 
-             {activeTab === 'stats' ? 'Match Stats' : activeTab === 'bet' ? 'Place a Bet' : 'Live Events'}
+             {activeTab === 'stats' ? <Activity size={18}/> : activeTab === 'bet' ? <Goal size={18}/> : activeTab === 'commentary' ? <MessageSquare size={18}/> : <Clock size={18}/>} 
+             {activeTab === 'stats' ? 'Match Stats' : activeTab === 'bet' ? 'Place a Bet' : activeTab === 'commentary' ? 'AI Commentator' : 'Live Events'}
            </h3>
 
            {activeTab === 'overview' && (
@@ -118,12 +113,21 @@ export default function LiveMatch() {
                 {events.slice().reverse().map((ev, idx) => (
                   <div key={idx} className="flex gap-3 bg-dark/50 p-3 rounded-lg border border-gray-700/50">
                     <div className="text-brand font-bold">{ev.minute}'</div>
-                    <div>
-                      <div className="font-bold text-sm text-white">{ev.type}</div>
-                      <div className="text-xs text-gray-400">{ev.team === 'home' ? matchData.home : matchData.away}</div>
-                    </div>
+                    <div><div className="font-bold text-sm text-white">{ev.type}</div><div className="text-xs text-gray-400">{ev.team === 'home' ? matchData.home : matchData.away}</div></div>
                   </div>
                 ))}
+             </div>
+           )}
+
+           {activeTab === 'commentary' && (
+             <div className="space-y-4">
+               {commentary.length === 0 && <div className="text-gray-500 italic text-center mt-10">Commentator is warming up...</div>}
+               {commentary.slice().reverse().map((c, idx) => (
+                 <div key={idx} className="flex gap-3 bg-gray-800/50 p-3 rounded-lg border-l-2 border-brand">
+                   <div className="text-brand font-bold text-xs mt-1">{c.minute}'</div>
+                   <div className="text-sm text-gray-200 italic">"{c.text}"</div>
+                 </div>
+               ))}
              </div>
            )}
 
@@ -172,4 +176,4 @@ export default function LiveMatch() {
       </div>
     </div>
   );
-}
+      }
