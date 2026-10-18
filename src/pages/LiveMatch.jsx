@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { io } from 'socket.io-client';
-import { ArrowLeft, Clock, Activity, Goal, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Clock, Activity, Goal, MessageSquare, Circle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
@@ -14,6 +14,7 @@ export default function LiveMatch() {
   const { user } = useAuth();
   
   const [matchData, setMatchData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [score, setScore] = useState({ home: 0, away: 0 });
   const [minute, setMinute] = useState(0);
   const [events, setEvents] = useState([]);
@@ -26,20 +27,41 @@ export default function LiveMatch() {
   const [betMessage, setBetMessage] = useState('');
 
   useEffect(() => {
-    axios.get(`${API_URL}/matches`).then(res => {
-      const match = res.data.matches[id];
-      if (match) setMatchData(match);
-      else navigate('/'); 
-    });
-  }, [id, navigate]);
+    // 1. Fetch match data
+    const fetchMatch = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/matches`);
+        const match = res.data.matches[id];
+        
+        if (match) {
+          setMatchData(match);
+          if (match.result) setScore(match.result); // If match already finished, show final score
+        } else {
+          console.error("Match not found in database");
+          // Don't navigate away, just show an error state
+          setMatchData({ error: true }); 
+        }
+      } catch (err) {
+        console.error("API Error:", err);
+        setMatchData({ error: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMatch();
+  }, [id]);
 
+  // 2. Setup Socket Listener
   useEffect(() => {
+    if (!id) return;
+    
     socket.on(`match_update_${id}`, (data) => {
       setScore(data.score);
       setMinute(data.minute);
-      setEvents(data.events);
+      setEvents(data.events || []);
       if (data.commentary) setCommentary(data.commentary);
     });
+    
     return () => socket.off(`match_update_${id}`);
   }, [id]);
 
@@ -60,17 +82,28 @@ export default function LiveMatch() {
     setIsPlacing(false);
   };
 
-  if (!matchData) return <div className="p-10 text-center text-white">Loading Match Data...</div>;
+  if (loading) return <div className="p-10 text-center text-white animate-pulse">Connecting to CipherTech Live...</div>;
+  
+  if (matchData?.error) {
+    return (
+      <div className="p-10 text-center text-white">
+        <h2 className="text-2xl font-bold text-red-500 mb-4">Match Not Found</h2>
+        <p className="text-gray-400 mb-6">We couldn't find this match in the database. It may have expired or the API is offline.</p>
+        <button onClick={() => navigate('/')} className="bg-brand px-6 py-2 rounded-lg font-bold">Go Back Home</button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 font-bold"><ArrowLeft size={20} /> Back to Dashboard</button>
 
+      {/* Header Scoreboard */}
       <div className="bg-card rounded-2xl border border-gray-700 p-6 mb-6 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden">
         {minute > 0 && <div className="absolute top-4 left-4 text-red-500 font-bold flex items-center gap-2 animate-pulse bg-red-500/10 px-3 py-1 rounded-full"><div className="w-2 h-2 bg-red-500 rounded-full"></div> LIVE {minute}'</div>}
         
         <div className="text-center flex-1 mt-6 md:mt-0">
-          <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.home[0]}</div>
+          <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.home?.[0] || 'H'}</div>
           <div className="text-xl font-bold">{matchData.home}</div>
         </div>
         <div className="text-center px-8 my-4 md:my-0">
@@ -78,17 +111,19 @@ export default function LiveMatch() {
           <div className="text-sm text-gray-400 mt-2 font-bold">{matchData.id} | {matchData.league}</div>
         </div>
         <div className="text-center flex-1">
-          <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.away[0]}</div>
+          <div className="w-16 h-16 mx-auto bg-gray-700 rounded-full mb-2 flex items-center justify-center text-xl font-black">{matchData.away?.[0] || 'A'}</div>
           <div className="text-xl font-bold">{matchData.away}</div>
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-gray-800 pb-2 overflow-x-auto">
         {['overview', 'commentary', 'stats', 'bet'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-2 rounded-lg font-bold capitalize transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-brand text-white' : 'text-gray-400 hover:bg-gray-800'}`}>{tab}</button>
         ))}
       </div>
 
+      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className={`lg:col-span-2 ${activeTab === 'overview' ? 'block' : 'hidden lg:block'}`}>
            <div className="bg-green-900/40 rounded-xl border border-green-800 p-4 h-[400px] relative flex items-center justify-center overflow-hidden">
@@ -176,4 +211,4 @@ export default function LiveMatch() {
       </div>
     </div>
   );
-      }
+                      }
