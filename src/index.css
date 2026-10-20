@@ -2,22 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body {
   background-color: #0f172a;
   color: #ffffff;
   font-family: 'Inter', system-ui, sans-serif;
+  overflow-x: hidden; /* Prevents accidental sideways scrolling on phones */
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent; /* Removes the blue flash when tapping buttons on mobile */
 }
 
-::-webkit-scrollbar {
-  width: 6px;
+/* Custom smooth scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Smooth Page Fade-in Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-::-webkit-scrollbar-track {
-  background: #1e293b; 
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
 }
-::-webkit-scrollbar-thumb {
-  background: #475569; 
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b; 
+
+/* Safe area for iPhones/Androids */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }
