@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
 import axios from 'axios';
 
 const DataContext = createContext();
@@ -30,13 +30,15 @@ export const DataProvider = ({ children }) => {
 
   useEffect(() => {
     fetchData();
-    // Background refresh every 20 seconds
-    const interval = setInterval(fetchData, 20000);
+    const interval = setInterval(fetchData, 20000); // 20s background sync
     return () => clearInterval(interval);
   }, []);
 
+  // useMemo stops the entire app from re-rendering if data is the same
+  const value = useMemo(() => ({ matches, bets, standings, loading, refresh: fetchData }), [matches, bets, standings, loading]);
+
   return (
-    <DataContext.Provider value={{ matches, bets, standings, loading, refresh: fetchData }}>
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );
