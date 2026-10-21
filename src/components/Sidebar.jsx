@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Activity, Calendar, Settings, Shield, X, CheckCircle, Trophy, Award, Ticket, ShieldAlert, BookOpen } from 'lucide-react';
 
-export default function Sidebar({ isOpen, toggleSidebar }) {
+// Added React.memo so it only re-renders when the URL changes
+const Sidebar = memo(({ isOpen, toggleSidebar }) => {
   const location = useLocation();
+  
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: <Home size={20} /> },
-    { name: 'Sportsbook', path: '/sportsbook', icon: <BookOpen size={20} /> },
+    { name: 'Place Bets', path: '/sportsbook', icon: <BookOpen size={20} /> },
     { name: 'Live Now', path: '/live', icon: <Activity size={20} /> },
     { name: 'Fixtures', path: '/fixtures', icon: <Calendar size={20} /> },
     { name: 'Results', path: '/results', icon: <CheckCircle size={20} /> },
@@ -30,12 +32,20 @@ export default function Sidebar({ isOpen, toggleSidebar }) {
         </div>
         <nav className="p-4 space-y-1">
           {menuItems.map((item) => (
-            <Link key={item.name} to={item.path} onClick={() => { if(window.innerWidth < 768) toggleSidebar(); }} className={`flex items-center gap-3 px-4 py-3 rounded-lg font-bold transition-colors ${location.pathname === item.path ? 'bg-brand text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}>
-              {item.icon} {item.name}
+            <Link
+              key={item.name}
+              to={item.path}
+              onClick={() => { if(window.innerWidth < 768) toggleSidebar(); }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-bold transition-all duration-200 ${location.pathname === item.path ? 'bg-brand text-white shadow-lg' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
+            >
+              {item.icon}
+              {item.name}
             </Link>
           ))}
         </nav>
       </div>
     </>
   );
-}
+});
+
+export default Sidebar;
