@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback } from 'react';
+import React, { useState, useMemo, memo, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -6,7 +6,6 @@ import { Ticket, Trash2, X } from 'lucide-react';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
 
-// MEMOIZED BUTTON - Prevents lag when clicking
 const OddBtn = memo(({ match, pick, odds, label, isSelected, onToggle }) => (
   <button 
     onClick={() => onToggle(match, pick, odds, label)} 
@@ -26,10 +25,10 @@ export default function Sportsbook() {
   const [message, setMessage] = useState('');
   const [isSlipOpen, setIsSlipOpen] = useState(false);
   const [marketTabs, setMarketTabs] = useState({});
+  const [sportFilter, setSportFilter] = useState('all');
 
   const changeTab = useCallback((matchId, tab) => setMarketTabs(prev => ({ ...prev, [matchId]: tab })), []);
 
-  // useCallback ensures this function isn't recreated on every render
   const togglePick = useCallback((match, pick, odds, label) => {
     setSlip(prev => {
       const filtered = prev.filter(p => p.matchId !== match.id);
@@ -114,86 +113,137 @@ export default function Sportsbook() {
 
   if (loading && Object.keys(matches).length === 0) return <div className="p-10 text-center text-white animate-pulse">Loading Sportsbook...</div>;
 
-  const scheduledMatches = Object.values(matches).filter(m => m.status === 'scheduled' || m.status === 'upcoming');
+  let scheduledMatches = Object.values(matches).filter(m => m.status === 'scheduled' || m.status === 'upcoming');
+  if (sportFilter !== 'all') scheduledMatches = scheduledMatches.filter(m => m.sport === sportFilter);
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto pb-24">
-      <h1 className="text-2xl font-black mb-6 flex items-center gap-2"><Ticket /> Place Bets</h1>
+      <h1 className="text-2xl font-black mb-4 flex items-center gap-2"><Ticket /> Place Bets</h1>
+
+      {/* SPORT FILTER */}
+      <div className="flex gap-2 mb-6 bg-card p-1 rounded-lg border border-gray-700 w-full max-w-sm">
+        <button onClick={() => setSportFilter('all')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${sportFilter === 'all' ? 'bg-brand text-white' : 'text-gray-400'}`}>All</button>
+        <button onClick={() => setSportFilter('football')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${sportFilter === 'football' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}>⚽ Football</button>
+        <button onClick={() => setSportFilter('basketball')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${sportFilter === 'basketball' ? 'bg-orange-600 text-white' : 'text-gray-400'}`}>🏀 Basketball</button>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* MATCHES LIST */}
         <div className="lg:col-span-2 space-y-4">
           {scheduledMatches.map(match => {
-            const currentTab = marketTabs[match.id] || '1X2';
+            const isBasketball = match.sport === 'basketball';
+            const currentTab = marketTabs[match.id] || (isBasketball ? 'ML' : '1X2');
+            
+            // Define tabs based on sport
+            const tabs = isBasketball ? ['ML', 'Totals', 'Spread'] : ['1X2', 'O/U', 'HDP', '1st Half', '10 Min', 'Score'];
+
             return (
               <div key={match.id} className="bg-card rounded-xl border border-gray-700 overflow-hidden shadow-lg">
                 <div className="p-4 border-b border-gray-700 bg-dark/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                  <div className="font-bold text-lg">{match.home} <span className="text-gray-500 text-sm font-normal">vs</span> {match.away}</div>
+                  <div className="font-bold text-lg flex items-center gap-2">
+                     {isBasketball ? '🏀' : '⚽'}
+                     {match.home} <span className="text-gray-500 text-sm font-normal">vs</span> {match.away}
+                  </div>
                   <div className="text-xs text-gray-500 font-bold bg-gray-800 px-2 py-1 rounded">{match.league}</div>
                 </div>
 
                 <div className="flex overflow-x-auto border-b border-gray-700 bg-dark text-xs font-bold hide-scrollbar">
-                  {['1X2', 'O/U', 'HDP', '1st Half', '10 Min', 'Score'].map(tab => (
+                  {tabs.map(tab => (
                     <button key={tab} onClick={() => changeTab(match.id, tab)} className={`px-4 py-3 whitespace-nowrap transition-colors ${currentTab === tab ? 'text-brand border-b-2 border-brand bg-brand/5' : 'text-gray-400 hover:text-white'}`}>{tab}</button>
                   ))}
                 </div>
 
                 <div className="p-4">
-                  {currentTab === '1X2' && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="home" odds={2.0} label="Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'home')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="draw" odds={3.0} label="Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'draw')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="away" odds={2.5} label="Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'away')} onToggle={togglePick} />
-                    </div>
-                  )}
-                  
-                  {currentTab === 'O/U' && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5].map(line => (
-                        <React.Fragment key={line}>
-                          <OddBtn match={match} pick={`over_${line}`} odds={1.9} label={`Over ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `over_${line}`)} onToggle={togglePick} />
-                          <OddBtn match={match} pick={`under_${line}`} odds={1.9} label={`Under ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `under_${line}`)} onToggle={togglePick} />
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentTab === 'HDP' && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {[-2, -1, +1, +2].map(line => (
-                        <React.Fragment key={line}>
-                          <OddBtn match={match} pick={`handicap_home_${line}`} odds={1.95} label={`Home ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_home_${line}`)} onToggle={togglePick} />
-                          <OddBtn match={match} pick={`handicap_away_${line}`} odds={1.95} label={`Away ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_away_${line}`)} onToggle={togglePick} />
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
-
-                  {currentTab === '1st Half' && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="ht_home" odds={2.5} label="HT Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_home')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="ht_draw" odds={2.2} label="HT Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_draw')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="ht_away" odds={3.0} label="HT Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_away')} onToggle={togglePick} />
-                    </div>
-                  )}
-
-                  {currentTab === '10 Min' && (
-                    <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="first10_home" odds={4.0} label="10m Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_home')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="first10_draw" odds={1.5} label="10m Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_draw')} onToggle={togglePick} />
-                      <OddBtn match={match} pick="first10_away" odds={5.0} label="10m Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_away')} onToggle={togglePick} />
-                    </div>
-                  )}
-
-                  {currentTab === 'Score' && (
-                    <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-2">
-                      {[0,1,2,3,4,5,6,7,8,9,10].map(h => 
-                        [0,1,2,3,4,5,6,7,8,9,10].map(a => (
-                          <OddBtn key={`${h}-${a}`} match={match} pick={`score_${h}-${a}`} odds={h===a?15:10} label={`${h}-${a}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `score_${h}-${a}`)} onToggle={togglePick} />
-                        ))
+                  {/* FOOTBALL MARKETS */}
+                  {!isBasketball && (
+                    <>
+                      {currentTab === '1X2' && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <OddBtn match={match} pick="home" odds={2.0} label="Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'home')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="draw" odds={3.0} label="Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'draw')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="away" odds={2.5} label="Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'away')} onToggle={togglePick} />
+                        </div>
                       )}
-                    </div>
+                      
+                      {currentTab === 'O/U' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5].map(line => (
+                            <React.Fragment key={line}>
+                              <OddBtn match={match} pick={`over_${line}`} odds={1.9} label={`Over ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `over_${line}`)} onToggle={togglePick} />
+                              <OddBtn match={match} pick={`under_${line}`} odds={1.9} label={`Under ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `under_${line}`)} onToggle={togglePick} />
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+
+                      {currentTab === 'HDP' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[-2, -1, +1, +2].map(line => (
+                            <React.Fragment key={line}>
+                              <OddBtn match={match} pick={`handicap_home_${line}`} odds={1.95} label={`Home ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_home_${line}`)} onToggle={togglePick} />
+                              <OddBtn match={match} pick={`handicap_away_${line}`} odds={1.95} label={`Away ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_away_${line}`)} onToggle={togglePick} />
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+
+                      {currentTab === '1st Half' && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <OddBtn match={match} pick="ht_home" odds={2.5} label="HT Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_home')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="ht_draw" odds={2.2} label="HT Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_draw')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="ht_away" odds={3.0} label="HT Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_away')} onToggle={togglePick} />
+                        </div>
+                      )}
+
+                      {currentTab === '10 Min' && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <OddBtn match={match} pick="first10_home" odds={4.0} label="10m Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_home')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="first10_draw" odds={1.5} label="10m Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_draw')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="first10_away" odds={5.0} label="10m Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_away')} onToggle={togglePick} />
+                        </div>
+                      )}
+
+                      {currentTab === 'Score' && (
+                        <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-2">
+                          {[0,1,2,3,4,5,6,7,8,9,10].map(h => 
+                            [0,1,2,3,4,5,6,7,8,9,10].map(a => (
+                              <OddBtn key={`${h}-${a}`} match={match} pick={`score_${h}-${a}`} odds={h===a?15:10} label={`${h}-${a}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `score_${h}-${a}`)} onToggle={togglePick} />
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* BASKETBALL MARKETS */}
+                  {isBasketball && (
+                    <>
+                      {currentTab === 'ML' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <OddBtn match={match} pick="home" odds={1.8} label="Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'home')} onToggle={togglePick} />
+                          <OddBtn match={match} pick="away" odds={2.2} label="Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'away')} onToggle={togglePick} />
+                        </div>
+                      )}
+
+                      {currentTab === 'Totals' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[180.5, 190.5, 200.5, 210.5, 220.5, 230.5, 240.5].map(line => (
+                            <React.Fragment key={line}>
+                              <OddBtn match={match} pick={`over_${line}`} odds={1.9} label={`Over ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `over_${line}`)} onToggle={togglePick} />
+                              <OddBtn match={match} pick={`under_${line}`} odds={1.9} label={`Under ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `under_${line}`)} onToggle={togglePick} />
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      )}
+
+                      {currentTab === 'Spread' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[-1.5, -3.5, -5.5, -7.5, -10.5, +1.5, +3.5, +5.5, +7.5, +10.5].map(line => (
+                            <OddBtn key={line} match={match} pick={`handicap_${line > 0 ? 'away' : 'home'}_${Math.abs(line)}`} odds={1.95} label={`${line > 0 ? 'Away' : 'Home'} ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_${line > 0 ? 'away' : 'home'}_${Math.abs(line)}`)} onToggle={togglePick} />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -201,20 +251,17 @@ export default function Sportsbook() {
           })}
         </div>
 
-        {/* DESKTOP BET SLIP */}
         <div className="hidden lg:block">
           <div className="sticky top-6"><BetSlipContent /></div>
         </div>
       </div>
 
-      {/* MOBILE FLOATING BUTTON */}
       {slip.length > 0 && !isSlipOpen && (
         <button onClick={() => setIsSlipOpen(true)} className="lg:hidden fixed bottom-6 right-6 bg-brand text-white rounded-full p-4 shadow-2xl flex items-center justify-center animate-bounce z-40 active:scale-90 transition-transform">
           <Ticket size={24} /><span className="absolute -top-2 -right-2 bg-white text-brand font-black text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-brand">{slip.length}</span>
         </button>
       )}
 
-      {/* MOBILE BET SLIP MODAL */}
       {isSlipOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/80 z-50 flex justify-center items-end p-0 animate-fade-in">
           <div className="w-full max-w-lg h-[85vh]">
@@ -226,4 +273,4 @@ export default function Sportsbook() {
       {message && <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-dark text-white font-bold p-3 rounded-lg shadow-xl z-50 border border-brand">{message}</div>}
     </div>
   );
-      }
+}
