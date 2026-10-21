@@ -1,13 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { Ticket, Trash2, X } from 'lucide-react';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
 
+// MEMOIZED BUTTON - Prevents lag when clicking
+const OddBtn = memo(({ match, pick, odds, label, isSelected, onToggle }) => (
+  <button 
+    onClick={() => onToggle(match, pick, odds, label)} 
+    className={`p-3 rounded-lg font-bold text-xs border transition-all duration-150 active:scale-95 ${isSelected ? 'bg-brand border-brand text-white shadow-lg' : 'bg-dark border-gray-700 text-gray-300 hover:border-brand'}`}
+  >
+    {label} <br/> <span className={`text-[11px] ${isSelected ? 'text-white' : 'text-green-400'}`}>{odds}x</span>
+  </button>
+));
+
 export default function Sportsbook() {
   const { user } = useAuth();
-  const [matches, setMatches] = useState([]);
+  const { matches, loading } = useData();
   const [slip, setSlip] = useState([]);
   const [amount, setAmount] = useState('');
   const [betType, setBetType] = useState('multiple'); 
@@ -16,23 +27,16 @@ export default function Sportsbook() {
   const [isSlipOpen, setIsSlipOpen] = useState(false);
   const [marketTabs, setMarketTabs] = useState({});
 
-  useEffect(() => {
-    const fetchMatches = async () => {
-      const res = await axios.get(`${API_URL}/matches`);
-      setMatches(Object.values(res.data.matches).filter(m => m.status === 'scheduled'));
-    };
-    fetchMatches();
-  }, []);
+  const changeTab = useCallback((matchId, tab) => setMarketTabs(prev => ({ ...prev, [matchId]: tab })), []);
 
-  const changeTab = (matchId, tab) => setMarketTabs(prev => ({ ...prev, [matchId]: tab }));
-
-  const togglePick = (match, pick, odds, label) => {
+  // useCallback ensures this function isn't recreated on every render
+  const togglePick = useCallback((match, pick, odds, label) => {
     setSlip(prev => {
       const filtered = prev.filter(p => p.matchId !== match.id);
       if (prev.find(p => p.matchId === match.id && p.pick === pick)) return filtered;
       return [...filtered, { matchId: match.id, home: match.home, away: match.away, pick, odds, label }];
     });
-  };
+  }, []);
 
   const totalOdds = slip.reduce((acc, curr) => acc * curr.odds, 1).toFixed(2);
   let potentialWin = 0, totalCost = 0;
@@ -57,17 +61,7 @@ export default function Sportsbook() {
     setPlacing(false);
   };
 
-  const OddBtn = ({ match, pick, odds, label }) => {
-    const isSelected = slip.find(p => p.matchId === match.id && p.pick === pick);
-    return (
-      <button onClick={() => togglePick(match, pick, odds, label)} className={`p-3 rounded-lg font-bold text-xs border transition-all active:scale-95 ${isSelected ? 'bg-brand border-brand text-white shadow-lg' : 'bg-dark border-gray-700 text-gray-300 hover:border-brand'}`}>
-        {label} <br/> <span className={`text-[11px] ${isSelected ? 'text-white' : 'text-green-400'}`}>{odds}x</span>
-      </button>
-    );
-  };
-
-  // The Bet Slip component (Used for both mobile and desktop)
-  const BetSlipContent = () => (
+  const BetSlipContent = memo(() => (
     <div className="flex flex-col h-full bg-card md:rounded-xl border border-gray-700 shadow-2xl md:shadow-none">
       <div className="flex justify-between items-center p-4 border-b border-gray-700">
         <h2 className="text-lg font-bold flex items-center gap-2"><Ticket size={20}/> Bet Slip ({slip.length})</h2>
@@ -116,7 +110,11 @@ export default function Sportsbook() {
         </button>
       </div>
     </div>
-  );
+  ));
+
+  if (loading && Object.keys(matches).length === 0) return <div className="p-10 text-center text-white animate-pulse">Loading Sportsbook...</div>;
+
+  const scheduledMatches = Object.values(matches).filter(m => m.status === 'scheduled' || m.status === 'upcoming');
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto pb-24">
@@ -126,7 +124,7 @@ export default function Sportsbook() {
         
         {/* MATCHES LIST */}
         <div className="lg:col-span-2 space-y-4">
-          {matches.map(match => {
+          {scheduledMatches.map(match => {
             const currentTab = marketTabs[match.id] || '1X2';
             return (
               <div key={match.id} className="bg-card rounded-xl border border-gray-700 overflow-hidden shadow-lg">
@@ -135,20 +133,18 @@ export default function Sportsbook() {
                   <div className="text-xs text-gray-500 font-bold bg-gray-800 px-2 py-1 rounded">{match.league}</div>
                 </div>
 
-                {/* MARKET TABS */}
                 <div className="flex overflow-x-auto border-b border-gray-700 bg-dark text-xs font-bold hide-scrollbar">
                   {['1X2', 'O/U', 'HDP', '1st Half', '10 Min', 'Score'].map(tab => (
                     <button key={tab} onClick={() => changeTab(match.id, tab)} className={`px-4 py-3 whitespace-nowrap transition-colors ${currentTab === tab ? 'text-brand border-b-2 border-brand bg-brand/5' : 'text-gray-400 hover:text-white'}`}>{tab}</button>
                   ))}
                 </div>
 
-                {/* ODDS CONTENT */}
                 <div className="p-4">
                   {currentTab === '1X2' && (
                     <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="home" odds={2.0} label="Home" />
-                      <OddBtn match={match} pick="draw" odds={3.0} label="Draw" />
-                      <OddBtn match={match} pick="away" odds={2.5} label="Away" />
+                      <OddBtn match={match} pick="home" odds={2.0} label="Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'home')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="draw" odds={3.0} label="Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'draw')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="away" odds={2.5} label="Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'away')} onToggle={togglePick} />
                     </div>
                   )}
                   
@@ -156,8 +152,8 @@ export default function Sportsbook() {
                     <div className="grid grid-cols-2 gap-2">
                       {[0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5].map(line => (
                         <React.Fragment key={line}>
-                          <OddBtn match={match} pick={`over_${line}`} odds={1.9} label={`Over ${line}`} />
-                          <OddBtn match={match} pick={`under_${line}`} odds={1.9} label={`Under ${line}`} />
+                          <OddBtn match={match} pick={`over_${line}`} odds={1.9} label={`Over ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `over_${line}`)} onToggle={togglePick} />
+                          <OddBtn match={match} pick={`under_${line}`} odds={1.9} label={`Under ${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `under_${line}`)} onToggle={togglePick} />
                         </React.Fragment>
                       ))}
                     </div>
@@ -167,8 +163,8 @@ export default function Sportsbook() {
                     <div className="grid grid-cols-2 gap-2">
                       {[-2, -1, +1, +2].map(line => (
                         <React.Fragment key={line}>
-                          <OddBtn match={match} pick={`handicap_home_${line}`} odds={1.95} label={`Home ${line > 0 ? '+' : ''}${line}`} />
-                          <OddBtn match={match} pick={`handicap_away_${line}`} odds={1.95} label={`Away ${line > 0 ? '+' : ''}${line}`} />
+                          <OddBtn match={match} pick={`handicap_home_${line}`} odds={1.95} label={`Home ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_home_${line}`)} onToggle={togglePick} />
+                          <OddBtn match={match} pick={`handicap_away_${line}`} odds={1.95} label={`Away ${line > 0 ? '+' : ''}${line}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `handicap_away_${line}`)} onToggle={togglePick} />
                         </React.Fragment>
                       ))}
                     </div>
@@ -176,17 +172,17 @@ export default function Sportsbook() {
 
                   {currentTab === '1st Half' && (
                     <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="ht_home" odds={2.5} label="HT Home" />
-                      <OddBtn match={match} pick="ht_draw" odds={2.2} label="HT Draw" />
-                      <OddBtn match={match} pick="ht_away" odds={3.0} label="HT Away" />
+                      <OddBtn match={match} pick="ht_home" odds={2.5} label="HT Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_home')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="ht_draw" odds={2.2} label="HT Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_draw')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="ht_away" odds={3.0} label="HT Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'ht_away')} onToggle={togglePick} />
                     </div>
                   )}
 
                   {currentTab === '10 Min' && (
                     <div className="grid grid-cols-3 gap-2">
-                      <OddBtn match={match} pick="first10_home" odds={4.0} label="10m Home" />
-                      <OddBtn match={match} pick="first10_draw" odds={1.5} label="10m Draw" />
-                      <OddBtn match={match} pick="first10_away" odds={5.0} label="10m Away" />
+                      <OddBtn match={match} pick="first10_home" odds={4.0} label="10m Home" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_home')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="first10_draw" odds={1.5} label="10m Draw" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_draw')} onToggle={togglePick} />
+                      <OddBtn match={match} pick="first10_away" odds={5.0} label="10m Away" isSelected={!!slip.find(p => p.matchId === match.id && p.pick === 'first10_away')} onToggle={togglePick} />
                     </div>
                   )}
 
@@ -194,7 +190,7 @@ export default function Sportsbook() {
                     <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-2">
                       {[0,1,2,3,4,5,6,7,8,9,10].map(h => 
                         [0,1,2,3,4,5,6,7,8,9,10].map(a => (
-                          <OddBtn key={`${h}-${a}`} match={match} pick={`score_${h}-${a}`} odds={h===a?15:10} label={`${h}-${a}`} />
+                          <OddBtn key={`${h}-${a}`} match={match} pick={`score_${h}-${a}`} odds={h===a?15:10} label={`${h}-${a}`} isSelected={!!slip.find(p => p.matchId === match.id && p.pick === `score_${h}-${a}`)} onToggle={togglePick} />
                         ))
                       )}
                     </div>
@@ -205,23 +201,20 @@ export default function Sportsbook() {
           })}
         </div>
 
-        {/* DESKTOP BET SLIP (Sticky Sidebar) */}
+        {/* DESKTOP BET SLIP */}
         <div className="hidden lg:block">
-          <div className="sticky top-6">
-            <BetSlipContent />
-          </div>
+          <div className="sticky top-6"><BetSlipContent /></div>
         </div>
-
       </div>
 
       {/* MOBILE FLOATING BUTTON */}
       {slip.length > 0 && !isSlipOpen && (
-        <button onClick={() => setIsSlipOpen(true)} className="lg:hidden fixed bottom-6 right-6 bg-brand text-white rounded-full p-4 shadow-2xl flex items-center justify-center animate-bounce z-40">
+        <button onClick={() => setIsSlipOpen(true)} className="lg:hidden fixed bottom-6 right-6 bg-brand text-white rounded-full p-4 shadow-2xl flex items-center justify-center animate-bounce z-40 active:scale-90 transition-transform">
           <Ticket size={24} /><span className="absolute -top-2 -right-2 bg-white text-brand font-black text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-brand">{slip.length}</span>
         </button>
       )}
 
-      {/* MOBILE BET SLIP OVERLAY */}
+      {/* MOBILE BET SLIP MODAL */}
       {isSlipOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/80 z-50 flex justify-center items-end p-0 animate-fade-in">
           <div className="w-full max-w-lg h-[85vh]">
