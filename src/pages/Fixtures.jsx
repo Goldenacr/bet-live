@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Hash, Trophy, CalendarDays, Star, Dribbble } from 'lucide-react';
 import { useData } from '../context/DataContext';
+
+const API_URL = 'https://ciphertech-api.onrender.com';
 
 // Priority helper function
 const getLeaguePriority = (league, sport) => {
@@ -13,7 +15,7 @@ const getLeaguePriority = (league, sport) => {
     if (l.includes('nba')) return 10;
     if (l.includes('euroleague')) return 11;
     if (l.includes('acb')) return 12;
-    return 13; // Other basketball
+    return 13;
   }
 
   // --- FOOTBALL PRIORITY ---
@@ -50,24 +52,49 @@ const getPriorityColor = (priority, sport) => {
 export default function Fixtures() {
   const { matches, loading } = useData();
   const navigate = useNavigate();
-  const [sportFilter, setSportFilter] = useState('all'); // 'all', 'football', 'basketball'
+  const [sportFilter, setSportFilter] = useState('all');
+  const [serverTimeOffset, setServerTimeOffset] = useState(0);
+
+  // 1. Fetch the true time from the API every minute
+  useEffect(() => {
+    const fetchTime = async () => {
+      try {
+        const res = await fetch(`${API_URL}/health`);
+        const data = await res.json();
+        if (data.timestamp) {
+          setServerTimeOffset(data.timestamp - Date.now());
+        }
+      } catch (err) {
+        console.error("Failed to fetch server time", err);
+      }
+    };
+    fetchTime();
+    const interval = setInterval(fetchTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatTime = (timestamp) => {
     if (!timestamp) return 'TBD';
-    return new Date(timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' GMT';
+    return new Date(timestamp).toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        timeZone: 'UTC' 
+    }) + ' GMT';
   };
 
   const groupedMatches = useMemo(() => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const tomorrow = today + (24 * 60 * 60 * 1000);
+    // 2. Apply the server offset to get the "true" time
+    const trueNow = new Date(Date.now() + serverTimeOffset);
+    
+    // 3. Force Today/Tomorrow calculation to UTC
+    const todayUTC = Date.UTC(trueNow.getUTCFullYear(), trueNow.getUTCMonth(), trueNow.getUTCDate());
+    const tomorrowUTC = todayUTC + (24 * 60 * 60 * 1000);
     
     let upcoming = Object.values(matches)
       .filter(m => m.status === 'scheduled' || m.status === 'upcoming' || m.status === 'live');
 
-    // Apply Sport Filter
     if (sportFilter !== 'all') {
-        upcoming = upcoming.filter(m => m.sport === sportFilter);
+      upcoming = upcoming.filter(m => m.sport === sportFilter);
     }
 
     upcoming.sort((a, b) => a.kickoff - b.kickoff);
@@ -75,17 +102,24 @@ export default function Fixtures() {
     const groups = {};
     upcoming.forEach(match => {
       const matchDate = new Date(match.kickoff);
-      const matchDay = new Date(Date.UTC(matchDate.getUTCFullYear(), matchDate.getUTCMonth(), matchDate.getUTCDate())).getTime();
+      // 4. Force match date to UTC for grouping
+      const matchDayUTC = Date.UTC(matchDate.getUTCFullYear(), matchDate.getUTCMonth(), matchDate.getUTCDate());
       
       let label = '';
-      if (matchDay === today) label = 'Today';
-      else if (matchDay === tomorrow) label = 'Tomorrow';
-      else label = matchDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+      if (matchDayUTC === todayUTC) label = 'Today';
+      else if (matchDayUTC === tomorrowUTC) label = 'Tomorrow';
+      else label = matchDate.toLocaleDateString('en-GB', { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long', 
+          timeZone: 'UTC' 
+      });
 
       if (!groups[label]) groups[label] = [];
       groups[label].push(match);
     });
 
+    // Sort within each day
     Object.keys(groups).forEach(label => {
       groups[label].sort((a, b) => {
         const priorityA = getLeaguePriority(a.league, a.sport);
@@ -96,7 +130,7 @@ export default function Fixtures() {
     });
     
     return groups;
-  }, [matches, sportFilter]);
+  }, [matches, sportFilter, serverTimeOffset]);
 
   if (loading && Object.keys(matches).length === 0) return <div className="p-10 text-center text-white animate-pulse">Loading Fixtures...</div>;
 
@@ -176,4 +210,4 @@ export default function Fixtures() {
       </div>
     </div>
   );
-                          }
+}
