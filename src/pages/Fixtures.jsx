@@ -5,12 +5,11 @@ import { useData } from '../context/DataContext';
 
 const API_URL = 'https://ciphertech-api.onrender.com';
 
-// Priority helper function
+// Priority helper function (Kept only for the colored side-bar and stars)
 const getLeaguePriority = (league, sport) => {
   if (!league) return 100;
   const l = league.toLowerCase();
   
-  // --- BASKETBALL PRIORITY ---
   if (sport === 'basketball' || l.includes('nba') || l.includes('acb') || l.includes('bsl') || l.includes('vtb') || l.includes('basket')) {
     if (l.includes('nba')) return 10;
     if (l.includes('euroleague')) return 11;
@@ -18,7 +17,6 @@ const getLeaguePriority = (league, sport) => {
     return 13;
   }
 
-  // --- FOOTBALL PRIORITY ---
   if (l.includes('premier league') && !l.includes('ghana') && !l.includes('npfl')) return 1;
   if (l.includes('la liga')) return 2;
   if (l.includes('serie a')) return 3;
@@ -90,6 +88,7 @@ export default function Fixtures() {
     const todayUTC = Date.UTC(trueNow.getUTCFullYear(), trueNow.getUTCMonth(), trueNow.getUTCDate());
     const tomorrowUTC = todayUTC + (24 * 60 * 60 * 1000);
     
+    // Grab ALL matches that are not finished
     let upcoming = Object.values(matches)
       .filter(m => m.status === 'scheduled' || m.status === 'upcoming' || m.status === 'live');
 
@@ -97,11 +96,14 @@ export default function Fixtures() {
       upcoming = upcoming.filter(m => m.sport === sportFilter);
     }
 
+    // --- SORT PURELY BY TIME ---
+    // This ensures every match is visible in chronological order, no matter the league.
     upcoming.sort((a, b) => a.kickoff - b.kickoff);
 
     const groups = {};
     upcoming.forEach(match => {
       const matchDate = new Date(match.kickoff);
+      
       // 4. Force match date to UTC for grouping
       const matchDayUTC = Date.UTC(matchDate.getUTCFullYear(), matchDate.getUTCMonth(), matchDate.getUTCDate());
       
@@ -117,16 +119,6 @@ export default function Fixtures() {
 
       if (!groups[label]) groups[label] = [];
       groups[label].push(match);
-    });
-
-    // Sort within each day
-    Object.keys(groups).forEach(label => {
-      groups[label].sort((a, b) => {
-        const priorityA = getLeaguePriority(a.league, a.sport);
-        const priorityB = getLeaguePriority(b.league, b.sport);
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        return a.kickoff - b.kickoff;
-      });
     });
     
     return groups;
